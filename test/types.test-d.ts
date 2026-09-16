@@ -240,3 +240,52 @@ describe("APIPromise", () => {
     expectTypeOf(requestId).toEqualTypeOf<string | undefined>();
   });
 });
+
+describe("choice wire labels", () => {
+  it("stringifies numeric labels and preserves mixed and quoted labels", async () => {
+    const { answers } = await client.systemOne({
+      state: null,
+      questions: {
+        numeric: choice(null, { 0: null, 1: null }),
+        mixed: choice(null, { 0: null, other: null }),
+        quoted: choice(null, { "0": null, "1": null }),
+      },
+    });
+    expectTypeOf(answers.numeric.choice).toEqualTypeOf<"0" | "1">();
+    expectTypeOf(answers.mixed.choice).toEqualTypeOf<"0" | "other">();
+    expectTypeOf(answers.quoted.choice).toEqualTypeOf<"0" | "1">();
+    expectTypeOf(answers.numeric.probabilities).toEqualTypeOf<{
+      readonly "0": number;
+      readonly "1": number;
+    }>();
+    expectTypeOf(answers.mixed.probabilities).toEqualTypeOf<{
+      readonly "0": number;
+      readonly other: number;
+    }>();
+    expectTypeOf(answers.numeric.probabilities[answers.numeric.choice]).toEqualTypeOf<number>();
+    expectTypeOf(answers.numeric.probabilities[0]).toEqualTypeOf<number>();
+  });
+
+  it("preserves readonly numeric criteria, including negative and fractional labels", async () => {
+    const criteria: Readonly<{ "-1": null; 1.5: null }> = { "-1": null, 1.5: null };
+    const { answers } = await client.systemOne({
+      state: null,
+      questions: { value: choice(null, criteria) },
+    });
+    expectTypeOf(answers.value.choice).toEqualTypeOf<"-1" | "1.5">();
+    expectTypeOf<keyof typeof answers.value.probabilities>().toEqualTypeOf<"-1" | "1.5">();
+  });
+
+  it("supports non-literal numeric and string criteria maps", async () => {
+    const numeric: Record<number, null> = { 0: null, 1: null };
+    const strings: Record<string, null> = { yes: null, no: null };
+    const { answers } = await client.systemOne({
+      state: null,
+      questions: { numeric: choice(null, numeric), strings: choice(null, strings) },
+    });
+    expectTypeOf(answers.numeric.choice).toEqualTypeOf<`${number}`>();
+    expectTypeOf<keyof typeof answers.numeric.probabilities>().toEqualTypeOf<`${number}`>();
+    expectTypeOf(answers.strings.choice).toEqualTypeOf<string>();
+    expectTypeOf<ChoiceResponse["choice"]>().toEqualTypeOf<string>();
+  });
+});
