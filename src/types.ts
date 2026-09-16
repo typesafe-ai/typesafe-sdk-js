@@ -79,13 +79,13 @@ export interface NoulResponse {
 /** A selected label and its probabilities. */
 export interface ChoiceResponse<T extends ChoiceCriteria = ChoiceCriteria> {
   readonly type: "choice";
-  /** The selected label. */
-  readonly choice: keyof T & string;
+  /** The selected label, with numeric criteria keys represented as JSON strings. */
+  readonly choice: `${keyof T & (string | number)}`;
   /** Reported confidence in the selected label. */
   readonly confidence: number;
   /** Probabilities keyed by label. */
   readonly probabilities: {
-    readonly [label in keyof T]: number;
+    readonly [label in keyof T as `${label & (string | number)}`]: number;
   };
 }
 
