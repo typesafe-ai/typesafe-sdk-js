@@ -181,10 +181,16 @@ const mergeHeaders = (
 const bufferResponse = async (response: Response, signal: AbortSignal): Promise<void> => {
   const reader = response.clone().body?.getReader();
   if (!reader) return;
+  // Older native fetch implementations cancel the original tee branch on abort. Keeping it
+  // locked prevents their unhandled cancellation rejection; we cancel through its reader below.
+  // Acquiring a reader does not consume the original body, so raw handoff remains readable.
+  const originalReader = response.body?.getReader();
+  // This reader is intentionally not consumed; observe errors and lock-release rejections.
+  void originalReader?.closed.catch(() => {});
   const cancel = (): void => {
     // Cancel both tee branches without waiting for an underlying source to acknowledge it.
     void reader.cancel(signal.reason).catch(() => {});
-    void response.body?.cancel(signal.reason).catch(() => {});
+    void originalReader?.cancel(signal.reason).catch(() => {});
   };
   signal.addEventListener("abort", cancel, { once: true });
   try {
@@ -197,6 +203,7 @@ const bufferResponse = async (response: Response, signal: AbortSignal): Promise<
   } finally {
     signal.removeEventListener("abort", cancel);
     reader.releaseLock();
+    originalReader?.releaseLock();
   }
 };
 
